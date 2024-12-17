@@ -10,8 +10,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
-import static com.bubnov.v5.model.Role.ROLE_USER;
-
 @Entity
 @DynamicUpdate
 @Builder
@@ -37,8 +35,8 @@ public class User implements UserDetails {
     private String email;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private Role role = ROLE_USER;
+    @Column(name = "role")
+    private Role role;
 
     @Column(name = "is_locked")
     private boolean locked = false;

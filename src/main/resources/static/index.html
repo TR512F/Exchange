@@ -14,24 +14,23 @@
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
 
-            stompClient.connect({}, function (frame) {
-                console.log('Connected: ' + frame);
+            const token = localStorage.getItem('token');
 
-                stompClient.subscribe('/topic/balances', function (message) {
+            stompClient.connect({ Authorization: `Bearer ${token}` }, (frame) => {
+                console.log('Connected:', frame);
+
+                stompClient.subscribe('/topic/balances', (message) => {
                     updateBalances(JSON.parse(message.body));
                 });
 
-                stompClient.subscribe('/topic/exchange-rates', function (message) {
+                stompClient.subscribe('/topic/exchange-rates', (message) => {
                     updateExchangeRates(JSON.parse(message.body));
                 });
-                stompClient.subscribe('/topic/messages', function (result) {
-                    console.log("!!mesgs: " + result.body)
-                    show(result.body);
-                });
-                stompClient.subscribe('/user/queue/notifications', function (result) { //TODO
-                    console.log("!!usr: " + result.body)
-                    // show(JSON.parse(result.body));
-                    show(result.body);
+
+                stompClient.subscribe('/user/queue/messages', (message) => {
+                    console.log("!!usr: " + message.body)
+                    // show(JSON.parse(message.body));
+                    show(message.body);
                 });
             });
         }
@@ -106,7 +105,7 @@
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            connect();
+            // connect();
         });
 
         function show(message) {
@@ -133,6 +132,7 @@
             localStorage.setItem('token', response.token);
 
             alert("Authorization successfully completed!");
+            await connect();
             await fetchBalances();
             await fetchExchangeRates();
         }
@@ -277,6 +277,7 @@
     <input type="text" id="username" placeholder="Name">
     <input type="password" id="password" placeholder="Password">
     <button onclick="authenticate()">Log In</button>
+<!--    <button onclick=connect()>WS Connect</button>-->
 </section>
 <section>
     <!--    <h3>Get exchange rate</h3>-->
@@ -293,8 +294,8 @@
 </section>
 <section>
     <!--    <h3>Exchange request</h3>-->
-    <input type="text" id="fromCurrency" placeholder="fromCurrency (например, USD)">
-    <input type="text" id="toCurrency" placeholder="toCurrency (например, EUR)">
+    <input type="text" id="fromCurrency" placeholder="fromCurrency (like, USD)">
+    <input type="text" id="toCurrency" placeholder="toCurrency (like, EUR)">
     <input type="number" id="amount" placeholder="amount">
     <button onclick="createExchangeRequest()">Exchange request</button>
 </section>

@@ -21,7 +21,7 @@ public class AuthenticationService {
 
     public String signUp(SignUpRequest request) {
 
-        var user = User.builder()
+        User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -45,18 +45,4 @@ public class AuthenticationService {
         var jwt = jwtService.generateToken(user);
         return new JwtAuthenticationResponse(jwt);
     }
-
-//    public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Map<String, Object> attributes) {
-//        String authHeader = request.getHeaders().getFirst("Authorization");
-//        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-//            String token = authHeader.substring(7);
-//            if (jwtService.validateToken(token)) {
-//                String username = jwtService.extractUsername(token);
-//                var userDetails = userService.loadUserByUsername(username);
-//                attributes.put("user", userDetails);
-//            }
-//        }
-//        return true;
-//    }
-
 }

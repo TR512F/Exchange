@@ -40,7 +40,7 @@ public class ExchangeRateController {
             @RequestParam BigDecimal rate) {
         fromCurrency = fromCurrency.toUpperCase();
         ExchangeRate exchangeRate = exchangeRateService.addExchangeRate(fromCurrency, "UAH", rate);
-        exchangeService.processPendingRequests();
+        exchangeService.pendingRequestsAll();
         return ResponseEntity.ok(exchangeRate);
     }
 }

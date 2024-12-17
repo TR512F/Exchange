@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -43,10 +44,10 @@ public class ExchangeRateService {
         );
     }
 
-    public BigDecimal getExchangeRate(String reqFromCurrencyCode, String reqFroCurrencyCode) {
+    public BigDecimal getExchangeRate(String reqFromCurrencyCode, String reqToCurrencyCode) {
         String fromCurrencyCode = reqFromCurrencyCode.toUpperCase();
-        String toCurrencyCode = reqFroCurrencyCode.toUpperCase();
-    if (fromCurrencyCode.equalsIgnoreCase(toCurrencyCode)) {
+        String toCurrencyCode = reqToCurrencyCode.toUpperCase();
+    if (fromCurrencyCode.equals(toCurrencyCode)) {
             return BigDecimal.ONE;
         }
 
@@ -56,11 +57,9 @@ public class ExchangeRateService {
         }
 
         Optional<BigDecimal> inverseRate = findDirectRate(toCurrencyCode, fromCurrencyCode);
-        if (inverseRate.isPresent()) {
-            return BigDecimal.ONE.divide(inverseRate.get(), 2, BigDecimal.ROUND_HALF_UP);
-        }
+        return inverseRate.map(bigDecimal -> BigDecimal.ONE.divide(bigDecimal, 2, RoundingMode.HALF_UP))
+                .orElseGet(() -> calculateCrossRate(fromCurrencyCode, toCurrencyCode));
 
-        return calculateCrossRate(fromCurrencyCode, toCurrencyCode);
     }
 
     private Optional<BigDecimal> findDirectRate(String fromCurrencyCode, String toCurrencyCode) {
@@ -70,12 +69,12 @@ public class ExchangeRateService {
     private BigDecimal calculateCrossRate(String fromCurrencyCode, String toCurrencyCode) {
         BigDecimal fromToUahRate = findDirectRate(fromCurrencyCode, "UAH")
                 .orElseGet(() -> findDirectRate("UAH", fromCurrencyCode)
-                        .map(rate -> BigDecimal.ONE.divide(rate, 2, BigDecimal.ROUND_HALF_UP))
+                        .map(rate -> BigDecimal.ONE.divide(rate, 2, RoundingMode.HALF_UP))
                         .orElseThrow(() -> new IllegalArgumentException("Exchange rate not available between " + fromCurrencyCode + " and UAH")));
 
         BigDecimal uahToToRate = findDirectRate("UAH", toCurrencyCode)
                 .orElseGet(() -> findDirectRate(toCurrencyCode, "UAH")
-                        .map(rate -> BigDecimal.ONE.divide(rate, 2, BigDecimal.ROUND_HALF_UP))
+                        .map(rate -> BigDecimal.ONE.divide(rate, 2, RoundingMode.HALF_UP))
                         .orElseThrow(() -> new IllegalArgumentException("Exchange rate not available between UAH and " + toCurrencyCode)));
 
         return fromToUahRate.multiply(uahToToRate);

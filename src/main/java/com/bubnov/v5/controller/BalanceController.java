@@ -24,6 +24,6 @@ public class BalanceController {
     public void addBalance(@RequestParam String currencyCode, @RequestParam BigDecimal amount) {
         currencyCode = currencyCode.toUpperCase();
         exchangeRateService.addBalance(currencyCode, amount);
-        exchangeService.processPendingRequests();
+        exchangeService.pendingRequestsByCurrency(currencyCode);
     }
 }

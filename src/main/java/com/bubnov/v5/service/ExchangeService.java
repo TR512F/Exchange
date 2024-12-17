@@ -4,29 +4,25 @@ import com.bubnov.v5.model.ExchangeRequest;
 import com.bubnov.v5.model.ExchangeStatus;
 import com.bubnov.v5.repository.ExchangeRequestRepository;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ExchangeService {
-    private final ExchangeRequestRepository exchangeRequestRepository;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final ExchangeRateService exchangeRateService;
 
-    @Autowired
-    public ExchangeService(ExchangeRequestRepository exchangeRequestRepository,
-                           SimpMessagingTemplate messagingTemplate,
-                           ExchangeRateService exchangeRateService) {
-        this.exchangeRequestRepository = exchangeRequestRepository;
-        this.messagingTemplate = messagingTemplate;
-        this.exchangeRateService = exchangeRateService;
-    }
+    private final ExchangeRequestRepository exchangeRequestRepository;
+    private final SimpUserRegistry simpUserRegistry;
+    private final WebSocketService webSocketService;
+    private final ExchangeRateService exchangeRateService;
 
     @Transactional
     public ExchangeRequest createExchangeRequest(String fromCurrency, String toCurrency, BigDecimal amount) {
@@ -49,42 +45,55 @@ public class ExchangeService {
             request.setStatus(ExchangeStatus.COMPLETED);
             exchangeRateService.deductBalance(toCurrency, requiredAmount);
         } else {
-            messagingTemplate.convertAndSend("/topic/messages", "Your exchange request is pending due to insufficient funds.");
-
-//TODO            messagingTemplate.convertAndSendToUser(
-//                    userId,
-//                    "/queue/notifications",
-//                    "USER!! Your exchange request is pending due to insufficient funds."
-//            );
+            webSocketService.sendMessageToUser(userId,
+                    "Your exchange request is pending due to insufficient funds.");
         }
 
         return exchangeRequestRepository.save(request);
     }
 
-    public void processPendingRequests() {
-        String userId = SecurityContextHolder.getContext().getAuthentication().getName(); // Получение текущего пользователя
-        List<ExchangeRequest> pendingRequests = exchangeRequestRepository.findByStatusAndUserId(
+    public void pendingRequestsAll() {
+        List<ExchangeRequest> pendingRequests = exchangeRequestRepository.findByStatus(ExchangeStatus.PENDING);
+        if (!pendingRequests.isEmpty()) {
+            checkPendingRequests(pendingRequests);
+        }
+    }
+
+    public void pendingRequestsByUser(String userId) {
+        List<ExchangeRequest> pendingRequests = exchangeRequestRepository.findByStatusAndUserId(ExchangeStatus.PENDING,
+                userId);
+        if (!pendingRequests.isEmpty()) {
+            checkPendingRequests(pendingRequests);
+        }
+    }
+
+    public void pendingRequestsByCurrency(String currencyCode) {
+        List<ExchangeRequest> pendingRequests = exchangeRequestRepository.findByStatusAndToCurrency(
                 ExchangeStatus.PENDING,
-                userId
+                currencyCode
         );
-        System.out.println("\n!!Panding!! " + pendingRequests);
+        if (!pendingRequests.isEmpty()) {
+            checkPendingRequests(pendingRequests);
+        }
+    }
+
+    public void checkPendingRequests(List<ExchangeRequest> pendingRequests) {
 
         for (ExchangeRequest request : pendingRequests) {
-            System.out.println("Зашли в pendingRequests");
-            BigDecimal currentRate = exchangeRateService.getExchangeRate(request.getFromCurrency(), request.getToCurrency()); //текущий(новый)
-            System.out.println("\n!! currentRate: " + currentRate);
-            BigDecimal requiredAmount = request.getAmount().multiply(currentRate);//количество денег
-            System.out.println("\n!! requiredAmount: " + requiredAmount);
 
+            if (simpUserRegistry.getUser(request.getUserId()) != null) {
+                BigDecimal currentRate = exchangeRateService.getExchangeRate(request.getFromCurrency(), request.getToCurrency())
+                        .setScale(2, RoundingMode.HALF_UP);
 
-            if (exchangeRateService.isReserveSufficient(request.getToCurrency(), requiredAmount)) {
-                System.out.println("\n!! Rates!!: currentRate: " + currentRate + " | " + request.getRateAtRequestTime());
-                if (currentRate.equals(request.getRateAtRequestTime())) {
-                    completeRequest(request, requiredAmount);
-                    System.out.println("\n!! complete!");
-                } else {
-                    System.out.println("\n!! oops!");
-                    notifyUserForRateChange(request, currentRate);
+                BigDecimal requiredAmount = request.getAmount().multiply(currentRate);
+
+                if (exchangeRateService.isReserveSufficient(request.getToCurrency(), requiredAmount)) {
+
+                    if (currentRate.equals(request.getRateAtRequestTime())) {
+                        completeRequest(request, requiredAmount);
+                    } else {
+                        notifyUserForRateChange(request, currentRate);
+                    }
                 }
             }
         }
@@ -95,27 +104,15 @@ public class ExchangeService {
             request.setStatus(ExchangeStatus.COMPLETED);
             exchangeRateService.deductBalance(request.getToCurrency(), requiredAmount);
             exchangeRequestRepository.save(request);
-
-            messagingTemplate.convertAndSend("/topic/messages", "Your exchange request has been completed at the requested rate.");
-
-//TODO        messagingTemplate.convertAndSendToUser(
-//                request.getUserId(),
-//                "/queue/notifications",
-//                "Your exchange request has been completed at the requested rate."
-//        );
+            webSocketService.sendMessageToUser(request.getUserId(),
+                    "Your exchange request №" + request.getId() + " has been completed at the requested rate.");
         }
     }
 
     private void notifyUserForRateChange(ExchangeRequest request, BigDecimal newRate) {
-        messagingTemplate.convertAndSend("/topic/messages", "Rate changed for your exchange request №" + request.getId() + ". New rate: " + newRate +
-                ". Please confirm or reject the request.");
-
-//TODO        messagingTemplate.convertAndSendToUser(
-//                request.getUserId(),
-//                "/queue/notifications",
-//                "Rate changed for your exchange request. New rate: " + newRate +
-//                        ". Please confirm or reject the request."
-//        );
+        webSocketService.sendMessageToUser(request.getUserId(),
+                "Rate changed for your exchange request №" + request.getId() + ". New rate: " + newRate +
+                        ". Please confirm or reject the request.");
     }
 
     public void confirmExchangeRequest(Long requestId) {
@@ -138,11 +135,8 @@ public class ExchangeService {
         if (request.getStatus() == ExchangeStatus.PENDING) {
             request.setStatus(ExchangeStatus.REJECTED);
             exchangeRequestRepository.save(request);
-            messagingTemplate.convertAndSendToUser(
-                    request.getUserId(),
-                    "/queue/notifications",
-                    "Your exchange request has been rejected."
-            );
+            webSocketService.sendMessageToUser(request.getUserId(),
+                    "Your exchange request №" + request.getId() + " has been rejected.");
         }
     }
 }
