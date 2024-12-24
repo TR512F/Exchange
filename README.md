@@ -24,6 +24,7 @@ password: ${DB_PASSWORD}
       в планах перевести работу с currency со String на Currency
 
 4. Added:
+    - WebSocket authorize by token
     - валидация в setExchangeRate() (курс > 0, валюта не пустая)
     - валидация в getExchangeRate() (курс > 0, валюты не пустае)
     - валидация в getMaxMinExchangeRate() (курс > 0, валюта не пустая)
