@@ -1,363 +1,267 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Currency Exchange API</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.js"></script>
-    <script>
-
-        function connect() {
-            let stompClient = null;
-
-            const socket = new SockJS('/ws');
-            stompClient = Stomp.over(socket);
-
-            const token = localStorage.getItem('token');
-
-            stompClient.connect({ Authorization: `Bearer ${token}` }, (frame) => {
-                console.log('Connected:', frame);
-
-                stompClient.subscribe('/topic/balances', (message) => {
-                    updateBalances(JSON.parse(message.body));
-                });
-
-                stompClient.subscribe('/topic/exchange-rates', (message) => {
-                    updateExchangeRates(JSON.parse(message.body));
-                });
-
-                stompClient.subscribe('/user/queue/messages', (message) => {
-                    console.log("!!usr: " + message.body)
-                    // show(JSON.parse(message.body));
-                    show(message.body);
-                });
-            });
-        }
-
-        function fetchBalances() {
-            const token = localStorage.getItem('token');
-            fetch('/api/balances', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-                .then(response => response.json())
-                .then(data => updateBalances(data));
-        }
-
-        function fetchExchangeRates() {
-            const token = localStorage.getItem('token');
-            fetch('/api/currencies', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-                .then(response => response.json())
-                .then(currencies => {
-                    const exchangeRates = {};
-
-                    const filteredCurrencies = currencies.filter(currency => currency.code !== 'UAH');
-
-                    const fetchPromises = filteredCurrencies.map(currency =>
-                        fetch(`/api/exchange-rates/rate?fromCurrency=${currency.code}&toCurrency=UAH`, {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            }
-                        })
-                            .then(response => response.json())
-                            .then(rate => {
-                                exchangeRates[`${currency.code}-UAH`] = rate;
-                            })
-                            .catch(err => console.error(`Error fetching rate for ${currency.code}-UAH:`, err))
-                    );
-
-                    Promise.all(fetchPromises).then(() => updateExchangeRates(exchangeRates));
-                })
-                .catch(err => console.error("Error fetching currencies:", err));
-        }
-
-        function updateBalances(balances) {
-            const balancesDiv = document.getElementById("balances");
-            balancesDiv.innerHTML = '';
-
-            for (const [currency, balance] of Object.entries(balances)) {
-                const balanceItem = document.createElement("div");
-                balanceItem.classList.add("item");
-                balanceItem.innerHTML = `<div>${currency}:${balance}</div>`;
-                balancesDiv.appendChild(balanceItem);
-            }
-        }
-
-        function updateExchangeRates(exchangeRates) {
-            const ratesDiv = document.getElementById("exchange-rates");
-            ratesDiv.innerHTML = '';
-
-            for (const [pair, rate] of Object.entries(exchangeRates)) {
-                const rateItem = document.createElement("div");
-                rateItem.classList.add("item");
-                rateItem.innerHTML = `<div>${pair}:${rate}</div>`;
-                ratesDiv.appendChild(rateItem);
-            }
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            // connect();
-        });
-
-        function show(message) {
-            const response = document.getElementById('messages');
-            const p = document.createElement('p');
-            p.innerHTML = "Message: " + message;
-            response.appendChild(p);
-        }
-
-        async function registration() {
-            const username = document.getElementById('regUsername').value;
-            const password = document.getElementById('regPassword').value;
-            const email = document.getElementById('regEmail').value;
-
-            const response = await sendRequest('/auth/sign-up', 'POST', {username, email, password});
-            if (response) alert("Registration successfully completed!");
-        }
-
-        async function authenticate() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            const response = await sendRequest('/auth/sign-in', 'POST', {username, password});
-            localStorage.setItem('token', response.token);
-
-            alert("Authorization successfully completed!");
-            await connect();
-            await fetchBalances();
-            await fetchExchangeRates();
-        }
-
-        async function sendRequest(endpoint, method, body = null) {
-            let headers;
-            if (endpoint === '/auth/sign-in') {
-                headers = {
-                    'Content-Type': 'application/json',
-                };
-            } else {
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
-                };
-            }
-
-            const options = {method, headers};
-            if (body) {
-                options.body = JSON.stringify(body);
-            }
-
-            const response = await fetch(endpoint, options);
-            if (!response.ok) {
-                try {
-                    const errorData = await response.json();
-                    alert(errorData.message || "An error occurred\nStatus: " + response.status);
-                } catch (e) {
-                    const errorText = await response.text();
-                    alert(errorText);
-                }
-            } else {
-                return response.json();
-            }
-        }
-
-        async function createExchangeRequest() {
-            const fromCurrency = document.getElementById('fromCurrency').value;
-            const toCurrency = document.getElementById('toCurrency').value;
-            const amount = document.getElementById('amount').value;
-
-            const response = await sendRequest('/exchange/create', 'POST', {
-                fromCurrency,
-                toCurrency,
-                amount: parseFloat(amount)
-            });
-
-            alert(`Exchange request created: ID ${response.id}, status: ${response.status}`);
-        }
-
-        async function blockUser() {
-            const username = document.getElementById('usernameToBlock').value;
-            const response = await sendRequest(`/admin/block/${username}`, 'PUT');
-            if (response) alert(`User ${username} blocked.`);
-        }
-
-        async function unblockUser() {
-            const username = document.getElementById('usernameToUnblock').value;
-            await sendRequest(`/admin/unblock/${username}`, 'PUT');
-            if (response) alert(`User ${username} unblocked.`);
-        }
-
-        async function setRoleAdmin() {
-            const username = document.getElementById('setRoleAdmin').value;
-            const response = await sendRequest(`/admin/set-admin/${username}`, 'PUT');
-            if (response) alert(`User ${username} set Admin.`);
-        }
-
-        async function setRoleUser() {
-            const username = document.getElementById('setRoleUser').value;
-            const response = await sendRequest(`/admin/set-user/${username}`, 'PUT');
-            if (response) alert(`User ${username} set User.`);
-        }
-
-        async function getExchangeRate() {
-            const fromCurrency = document.getElementById('fromCurrencyRate').value;
-            const toCurrency = document.getElementById('toCurrencyRate').value;
-
-            const response = await sendRequest(`/api/exchange-rates/rate?fromCurrency=${fromCurrency}&toCurrency=${toCurrency}`, 'GET');
-            if (response) alert(`Rete ${fromCurrency} -> ${toCurrency}: ${response}`);
-        }
-
-        async function confirm() {
-            const reqId = document.getElementById('reqId').value;
-            await sendRequest(`/exchange/approve?reqId=${reqId}&isApproved=true`, 'POST');
-        }
-
-        async function reject() {
-            const reqId = document.getElementById('reqId').value;
-            await sendRequest(`/exchange/approve?reqId=${reqId}&isApproved=false`, 'POST');
-        }
-
-
-        async function addCurrency() {
-            const currencyCode = document.getElementById('currencyCodeAdd').value;
-            await sendRequest(`/api/currencies?currencyCode=${currencyCode}`, 'POST');
-        }
-
-        async function deleteCurrency() {
-            const currencyCode = document.getElementById('currencyCodeDel').value;
-            await sendRequest(`/api/currencies?currencyCode=${currencyCode}`, 'DELETE');
-        }
-
-        async function setExchangeRate() {
-            const fromCurrency = document.getElementById('fromCurrencyRateSet').value;
-            const rate = document.getElementById('setRate').value;
-            const amount = parseFloat(rate);
-            await sendRequest(`/api/exchange-rates/set-rate?fromCurrency=${fromCurrency}&rate=${amount}`, 'POST');
-        }
-
-        async function getExchangeRateByPeriod() {
-            const fromCurrency = document.getElementById('fromCurrencyRateByDate').value;
-            const period = document.getElementById('period').value;
-
-            const response = await sendRequest(`/api/exchange-rates/max-min?fromCurrency=${fromCurrency}&&period=${period}`, 'GET');
-            if (response) alert(`Max Rate: ${response.maxRate}\nMin Rate: ${response.minRate}`);
-        }
-
-        function addAmount() {
-            const currencyCode = document.getElementById('currencyCodeAddAmount').value;
-            const amount = document.getElementById('addAmount').value;
-            sendRequest(`/api/balances?currencyCode=${currencyCode}&amount=${amount}`, 'POST');
-        }
-    </script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-    </style>
+    <meta charset="UTF-8"/>
+    <title>Currency Exchange</title>
+    <link rel="stylesheet" href="styles.css"/>
+    <link
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+            rel="stylesheet"
+            integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+            crossorigin="anonymous"
+    />
+    <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"
+            integrity="sha512-iKDtgDyTHjAitUDdLljGhenhPwrbBfqTKWO1mkhSFH3A7blITC9MhYon6SjnMhp4o0rADGw9yAC6EW4t5a4K3g=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+    ></script>
+    <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"
+            integrity="sha512-1QvjE7BtotQjkq8PxLeF6P46gEpBRXuskzIVgjFpekzFVF4yjRgrQvTG1MTOJ3yQgvTteKAcO7DSZI92+u/yZw=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+    ></script>
+    <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
+            integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+    ></script>
 </head>
 <body>
-<h2>Currency Exchange API Interface</h2>
-<section>
-    <h3>Exchange Rates</h3>
-    <div id="exchange-rates"></div>
-    <h3>Currency Balances</h3>
-    <div id="balances"></div>
-    <br/>
-</section>
-<section>
-    <!--    <h3>Authorization</h3>-->
-    <input type="text" id="username" placeholder="Name">
-    <input type="password" id="password" placeholder="Password">
-    <button onclick="authenticate()">Log In</button>
-<!--    <button onclick=connect()>WS Connect</button>-->
-</section>
-<section>
-    <!--    <h3>Get exchange rate</h3>-->
-    <input type="text" id="fromCurrencyRate" placeholder="from Currency">
-    <input type="text" id="toCurrencyRate" placeholder="to Currency">
-    <button onclick="getExchangeRate()">Get exchange rate</button>
-</section>
-<section>
-    <!--    <h3>Get max-min exchange rate</h3>-->
-    <input type="text" id="fromCurrencyRateByDate" placeholder="from Currency">
-    to UAH
-    <input type="text" id="period" placeholder="per day/week/month">
-    <button onclick="getExchangeRateByPeriod()">Get max-min exchange rate</button>
-</section>
-<section>
-    <!--    <h3>Exchange request</h3>-->
-    <input type="text" id="fromCurrency" placeholder="fromCurrency (like, USD)">
-    <input type="text" id="toCurrency" placeholder="toCurrency (like, EUR)">
-    <input type="number" id="amount" placeholder="amount">
-    <button onclick="createExchangeRequest()">Exchange request</button>
-</section>
-<section>
-    <div id="messages"></div>
-    <br/>
-    <input type="number" id="reqId" placeholder="request №">
-    <button onclick="confirm()">confirm</button>
-    <button onclick="reject()">reject</button>
-    <br/>
-</section>
-<h3>ADMIN tools</h3>
-<section>
-    <!--    <h3>Block User</h3>-->
-    <input type="text" id="usernameToBlock" placeholder="user name">
-    <button onclick="blockUser()">Block User</button>
-</section>
-<section>
-    <!--    <h3>Add currency</h3>-->
-    <input type="text" id="currencyCodeAdd" placeholder="currency code">
-    <button onclick="addCurrency()">Add currency</button>
-</section>
-<section>
-    <!--    <h3>Delete currency</h3>-->
-    <input type="text" id="currencyCodeDel" placeholder="currency code">
-    <button onclick="deleteCurrency()">Delete currency</button>
-</section>
-<section>
-    <!--    <h3>Add amount</h3>-->
-    <input type="text" id="currencyCodeAddAmount" placeholder="currency code">
-    <input type="text" id="addAmount" placeholder="amount">
-    <button onclick="addAmount()">Add amount</button>
-</section>
-<section>
-    <!--    <h3>Set exchange rate</h3>-->
-    <input type="text" id="fromCurrencyRateSet" placeholder="from Currency">
-    to UAH
-    <input type="text" id="setRate" placeholder="rate">
-    <button onclick="setExchangeRate()">Set exchange rate</button>
-</section>
-<section>
-    <!--    <h3>Registration</h3>-->
-    <input type="text" id="regUsername" placeholder="UserName">
-    <input type="email" id="regEmail" placeholder="email">
-    <input type="password" id="regPassword" placeholder="Password">
-    <button onclick="registration()">Register user</button>
-</section>
-<h3>ADMIN EXTRA tools</h3>
-<section>
-    <!--    <h3>Unblock User</h3>-->
-    <input type="text" id="usernameToUnblock" placeholder="user name">
-    <button onclick="unblockUser()">UnBlock User</button>
-</section>
-<section>
-    <!--    <h3>Unblock User</h3>-->
-    <input type="text" id="setRoleAdmin" placeholder="user name">
-    <button onclick="setRoleAdmin()">Set role Admin</button>
-</section>
-<section>
-    <!--    <h3>Unblock User</h3>-->
-    <input type="text" id="setRoleUser" placeholder="user name">
-    <button onclick="setRoleUser()">Set role User</button>
-</section>
+<div class="container">
+    <div class="row mt-4 border-bottom border-3">
+        <div class="col-6">
+            <h2>Currency Exchange API</h2>
+        </div>
+        <div id="login-div" class="col-6">
+            <form id="login-form" class="d-flex gap-2">
+                <input type="text" class="form-control" placeholder="username" id="login-username" name="login-username"
+                       required>
+                <input type="password" class="form-control" placeholder="password" id="password" name="password"
+                       required>
+                <button type="submit" id="login-btn" class="btn btn-primary btn-sm px-4">Login</button>
+            </form>
+        </div>
+    </div>
+</div>
+<div id="authorized" class="row border p-1 mt-3 rounded justify-content-center d-none"
+     style="max-width: fit-content; margin: 0 auto;">
+    <div class="col-auto" style="max-width: 160px;">
+        <div class="row border p-1 rounded">
+            <h4 class="text-primary">Exchange Rates</h4>
+            <div id="exchange-rates">
+            </div>
+        </div>
+        <div class="row border p-1 rounded">
+            <h4 class="text-primary">Currency Balances</h4>
+            <div id="balances">
+            </div>
+        </div>
+    </div>
+    <div class="col-auto" style="max-width: 650px;">
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <select class="form-control" id="fromCurrencyRate" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col">
+                <select class="form-control" id="toCurrencyRate" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" style="width: 200px;" onclick="getExchangeRate()">Calculate
+                    exchange rate
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 align-items-center g-1">
+            <div class="col">
+                <select class="form-control" id="fromCurrencyRateByDate" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col d-flex justify-content-center">
+                <div class="btn-group" role="group" aria-label="Time period">
+                    <input type="radio" class="btn-check" name="period" id="day" value="day"
+                           autocomplete="off" checked>
+                    <label class="btn btn-outline-primary" for="day">Day</label>
+
+                    <input type="radio" class="btn-check" name="period" id="week" value="week"
+                           autocomplete="off">
+                    <label class="btn btn-outline-primary" for="week">Week</label>
+
+                    <input type="radio" class="btn-check" name="period" id="month" value="month"
+                           autocomplete="off">
+                    <label class="btn btn-outline-primary" for="month">Month</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" style="width: 200px;" onclick="getExchangeRateByPeriod()">
+                    Calculate max-min exchange
+                    rate to UAH
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <select class="form-control" id="fromCurrency" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col">
+                <select class="form-control" id="toCurrency" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" id="amount" placeholder="amount" required/>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-success" style="width: 200px;" onclick="createExchangeRequest()">
+                    Exchange
+                </button>
+            </div>
+        </div>
+        <div class="container mt-4">
+            <div id="websocket" class="d-none">
+                <div class="row border p-3 rounded">
+                    <div id="message-container" class="message-container">
+                        <div id="message-output" style="max-height: 200px; overflow-y: auto;"
+                             class="message-output"></div>
+                    </div>
+                </div>
+                <div id="confirm-reject" class="row mt-1 d-none">
+                    <div class="col-4 d-flex justify-content-center">
+                        <button class="btn btn-success" style="width: 200px;" onclick="confirm()">confirm
+                        </button>
+                    </div>
+                    <div class="col-4">
+                        <input type="number" class="form-control" id="reqId" placeholder="request №" required/>
+                    </div>
+                    <div class="col-4 d-flex justify-content-center">
+                        <button class="btn btn-danger" style="width: 200px;" onclick="reject()">reject</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="adminTools" class="col-auto border p-1 rounded d-none" style="width: 350px;">
+        <div style="text-align: center">
+            <h4 class="text-primary">Admin tools</h4>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <input type="text" class="form-control" id="usernameToBlock" placeholder="Username">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-danger" style="width: 140px;" onclick="blockUser()">Block User
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <input type="text" class="form-control" id="usernameToUnblock" placeholder="Username">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-success" style="width: 140px;" onclick="unblockUser()">Unblock User
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <input type="text" class="form-control" id="setRoleAdmin" placeholder="Username">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" style="width: 140px;" onclick="setRoleAdmin()">Set Role
+                    Admin
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <input type="text" class="form-control" id="setRoleUser" placeholder="Username">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" style="width: 140px;" onclick="setRoleUser()">Set Role
+                    User
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <input type="text" class="form-control" id="currencyCodeAdd" placeholder="Code">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" style="width: 140px;" onclick="addCurrency()">Add currency
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <select class="form-control" id="currencyCodeDel" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-danger" style="width: 140px;" onclick="deleteCurrency()">Delete
+                    currency
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <select class="form-control" id="fromCurrencyRateSet" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" id="setRate" placeholder="rate">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" style="width: 140px;" onclick="setExchangeRate()">Set rate
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1 g-1">
+            <div class="col">
+                <select class="form-control" id="currencyCodeAddAmount" required>
+                    <option value="" disabled selected>Select currency</option>
+                </select>
+            </div>
+            <div class="col">
+                <input type="number" class="form-control" id="addAmount" placeholder="amount" required>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" id="addAmountButton" style="width: 140px;" onclick="addAmount()">Add
+                    amount
+                </button>
+            </div>
+        </div>
+        <div class="row mt-1">
+            <div class="col">
+                <input type="text" class="form-control" id="regUsername" placeholder="Username">
+            </div>
+            <div class="col-auto">
+                <input type="email" class="form-control" id="regEmail" style="width: 140px;"
+                       placeholder="Email">
+            </div>
+        </div>
+        <div class="row mt-1">
+            <div class="col">
+                <input type="password" class="form-control" id="regPassword" placeholder="Password">
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-warning" style="width: 140px;" onclick="registration()">Register
+                    user
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="index.js"></script>
 </body>
 </html>

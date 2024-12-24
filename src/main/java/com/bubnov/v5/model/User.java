@@ -1,6 +1,7 @@
 package com.bubnov.v5.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.security.core.GrantedAuthority;
@@ -26,12 +27,15 @@ public class User implements UserDetails {
     private Long id;
 
     @Column(name = "username", unique = true, nullable = false)
+    @NotBlank(message = "Username cannot be blank")
     private String username;
 
     @Column(name = "password", nullable = false)
+    @NotBlank(message = "Password cannot be blank")
     private String password;
 
     @Column(name = "email", unique = true, nullable = false)
+    @NotBlank(message = "Email cannot be blank")
     private String email;
 
     @Enumerated(EnumType.STRING)

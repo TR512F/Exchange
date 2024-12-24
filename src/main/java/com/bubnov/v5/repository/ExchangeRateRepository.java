@@ -1,7 +1,9 @@
 package com.bubnov.v5.repository;
 
+import com.bubnov.v5.model.Currency;
 import com.bubnov.v5.model.ExchangeRate;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -11,6 +13,10 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 @Repository
 public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Long> {
+
+    @Modifying
+    @Query("DELETE FROM ExchangeRate e WHERE e.fromCurrency = :currency")
+    void deleteByFromCurrency(@Param("currency") Currency currency);
 
     @Query("SELECT MAX(er.rate) FROM ExchangeRate er WHERE er.fromCurrency.code = :fromCurrency AND er.toCurrency.code = :toCurrency AND er.timestamp >= :startDate")
     Optional<BigDecimal> findMaxRate(@Param("fromCurrency") String fromCurrency, @Param("toCurrency") String toCurrency, @Param("startDate") LocalDateTime startDate);

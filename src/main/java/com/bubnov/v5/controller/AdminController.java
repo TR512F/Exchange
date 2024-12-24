@@ -4,39 +4,59 @@ import com.bubnov.v5.model.Role;
 import com.bubnov.v5.service.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin")
 @AllArgsConstructor
 public class AdminController {
+    private final UserService userService;
+    private final Map<String, String> response = new HashMap<>();
 
-    private UserService userService;
-
-    @PutMapping("/block/{username}")
-    public ResponseEntity<?> blockUser(@PathVariable String username) {
+    @PutMapping("/block")
+    public ResponseEntity<?> blockUser(@RequestParam String username) {
+        if (username == null || username.trim().isEmpty()){
+            response.put("message", "Username cannot be empty");
+            return ResponseEntity.badRequest().body(response);
+        }
         userService.blockUser(username, true);
-        return ResponseEntity.ok("User blocked successfully");
+        response.put("message", "User blocked successfully");
+        return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/unblock/{username}")
-    public ResponseEntity<String> unblockUser(@PathVariable String username) {
+    @PutMapping("/unblock")
+    public ResponseEntity<?> unblockUser(@RequestParam String username) {
+        if (username == null || username.trim().isEmpty()){
+            response.put("message", "Username cannot be empty");
+            return ResponseEntity.badRequest().body(response);
+        }
         userService.blockUser(username, false);
-        return ResponseEntity.ok("User unblocked successfully");
+        response.put("message", "User unblocked successfully");
+        return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/set-admin/{username}")
-    public ResponseEntity<?> setAdmin(@PathVariable String username) {
+    @PutMapping("/set-admin")
+    public ResponseEntity<?> setAdmin(@RequestParam String username) {
+        if (username == null || username.trim().isEmpty()){
+            response.put("message", "Username cannot be empty");
+            return ResponseEntity.badRequest().body(response);
+        }
         userService.setRole(username, Role.ROLE_ADMIN);
-        return ResponseEntity.ok("Role Admin set successfully successfully");
+        response.put("message", "Role Admin set successfully");
+        return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/set-user/{username}")
-    public ResponseEntity<String> setUser(@PathVariable String username) {
+    @PutMapping("/set-user")
+    public ResponseEntity<?> setUser(@RequestParam String username) {
+        if (username == null || username.trim().isEmpty()){
+            response.put("message", "Username cannot be empty");
+            return ResponseEntity.badRequest().body(response);
+        }
         userService.setRole(username, Role.ROLE_USER);
-        return ResponseEntity.ok("Role User set successfully successfully");
+        response.put("message", "Role User set successfully");
+        return ResponseEntity.ok(response);
     }
 }

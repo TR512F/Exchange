@@ -3,22 +3,20 @@ package com.bubnov.v5.controller;
 import com.bubnov.v5.model.Currency;
 import com.bubnov.v5.repository.CurrencyRepository;
 import com.bubnov.v5.service.ExchangeRateService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
+@AllArgsConstructor
 @RequestMapping("/api/currencies")
 public class CurrencyController {
-
-    @Autowired
-    private CurrencyRepository currencyRepository;
-
-    @Autowired
-    private ExchangeRateService exchangeRateService;
+    private final CurrencyRepository currencyRepository;
+    private final ExchangeRateService exchangeRateService;
 
     @GetMapping
     public ResponseEntity<List<Currency>> getAllCurrencies() {
@@ -26,7 +24,10 @@ public class CurrencyController {
     }
 
     @PostMapping
-    public ResponseEntity<Currency> addCurrency(@RequestParam String currencyCode){
+    public ResponseEntity<?> addCurrency(@RequestParam String currencyCode){
+        if (currencyCode == null || currencyCode.trim().isEmpty()){
+            return ResponseEntity.badRequest().body(Map.of("message", "Currency code cannot be empty."));
+        }
         currencyCode = currencyCode.toUpperCase();
         if (currencyRepository.existsByCode(currencyCode)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(null);

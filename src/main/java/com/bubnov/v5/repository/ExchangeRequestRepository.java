@@ -9,6 +9,6 @@ import java.util.List;
 @Repository
 public interface ExchangeRequestRepository extends JpaRepository<ExchangeRequest, Long> {
     List<ExchangeRequest> findByStatus(ExchangeStatus status);
-    List<ExchangeRequest> findByStatusAndUserId(ExchangeStatus status, String userId);
+//    List<ExchangeRequest> findByStatusAndUserId(ExchangeStatus status, String userId);
     List<ExchangeRequest> findByStatusAndToCurrency(ExchangeStatus status, String toCurrency);
 }

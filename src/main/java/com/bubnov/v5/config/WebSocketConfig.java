@@ -32,7 +32,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtService jwtService;
     private final UserService userService;
-//    private final ExchangeService exchangeService;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -68,7 +67,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
 
                     accessor.setUser(usernamePasswordAuthenticationToken);
-//                    exchangeService.pendingRequestsByUser(username);
                 }
                 return message;
             }

@@ -1,5 +1,6 @@
 package com.bubnov.v5.service;
 
+import com.bubnov.v5.model.Currency;
 import com.bubnov.v5.model.ExchangeRequest;
 import com.bubnov.v5.model.ExchangeStatus;
 import com.bubnov.v5.repository.ExchangeRequestRepository;
@@ -44,9 +45,6 @@ public class ExchangeService {
         if (exchangeRateService.isReserveSufficient(toCurrency, requiredAmount)) {
             request.setStatus(ExchangeStatus.COMPLETED);
             exchangeRateService.deductBalance(toCurrency, requiredAmount);
-        } else {
-            webSocketService.sendMessageToUser(userId,
-                    "Your exchange request is pending due to insufficient funds.");
         }
 
         return exchangeRequestRepository.save(request);
@@ -59,13 +57,13 @@ public class ExchangeService {
         }
     }
 
-    public void pendingRequestsByUser(String userId) {
-        List<ExchangeRequest> pendingRequests = exchangeRequestRepository.findByStatusAndUserId(ExchangeStatus.PENDING,
-                userId);
-        if (!pendingRequests.isEmpty()) {
-            checkPendingRequests(pendingRequests);
-        }
-    }
+//    public void pendingRequestsByUser(String userId) {
+//        List<ExchangeRequest> pendingRequests = exchangeRequestRepository.findByStatusAndUserId(ExchangeStatus.PENDING,
+//                userId);
+//        if (!pendingRequests.isEmpty()) {
+//            checkPendingRequests(pendingRequests);
+//        }
+//    }
 
     public void pendingRequestsByCurrency(String currencyCode) {
         List<ExchangeRequest> pendingRequests = exchangeRequestRepository.findByStatusAndToCurrency(

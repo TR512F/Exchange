@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @Data
@@ -38,16 +39,19 @@ public class ExchangeRateService {
         this.exchangeRateRepository = exchangeRateRepository;
         this.currencyRepository = currencyRepository;
         this.messagingTemplate = messagingTemplate;
+        putBalance(1000);
+    }
 
+    public void putBalance(int balance){
         currencyRepository.findAll().forEach(currency ->
-                balances.put(currency.getCode(), BigDecimal.valueOf(1000))
+                balances.put(currency.getCode(), BigDecimal.valueOf(balance))
         );
     }
 
     public BigDecimal getExchangeRate(String reqFromCurrencyCode, String reqToCurrencyCode) {
         String fromCurrencyCode = reqFromCurrencyCode.toUpperCase();
         String toCurrencyCode = reqToCurrencyCode.toUpperCase();
-    if (fromCurrencyCode.equals(toCurrencyCode)) {
+        if (fromCurrencyCode.equals(toCurrencyCode)) {
             return BigDecimal.ONE;
         }
 
@@ -59,7 +63,6 @@ public class ExchangeRateService {
         Optional<BigDecimal> inverseRate = findDirectRate(toCurrencyCode, fromCurrencyCode);
         return inverseRate.map(bigDecimal -> BigDecimal.ONE.divide(bigDecimal, 2, RoundingMode.HALF_UP))
                 .orElseGet(() -> calculateCrossRate(fromCurrencyCode, toCurrencyCode));
-
     }
 
     private Optional<BigDecimal> findDirectRate(String fromCurrencyCode, String toCurrencyCode) {
@@ -97,18 +100,21 @@ public class ExchangeRateService {
             messagingTemplate.convertAndSend("/topic/exchange-rates", latestRates);
             return savedExchangeRate;
 
-        }else throw new RuntimeException("Currency not found");
+        } else throw new RuntimeException("Currency not found");
     }
 
     @Transactional
     public void removeExchangeRate(String reqFromCurrencyCode) {
         String currencyCode = reqFromCurrencyCode.toUpperCase();
-        if (currencyRepository.existsByCode(currencyCode)) {
-            currencyRepository.deleteCurrencyByCode(currencyCode);
+            Currency currency = currencyRepository.findCurrenciesByCode(currencyCode);
+        if (currency != null){
+
+            exchangeRateRepository.deleteByFromCurrency(currency);
+            currencyRepository.delete(currency);
 
             Map<String, BigDecimal> latestRates = getCurrentExchangeRatesToUAH();
             messagingTemplate.convertAndSend("/topic/exchange-rates", latestRates);
-        }else throw new RuntimeException("Currency not found");
+        } else throw new RuntimeException("Currency not found");
     }
 
     public Map<String, BigDecimal> getCurrentExchangeRatesToUAH() {
@@ -118,7 +124,7 @@ public class ExchangeRateService {
         for (Currency currency : currencies) {
             if (!currency.getCode().equals("UAH")) {
                 Optional<BigDecimal> rate = exchangeRateRepository.findLatestRate(currency.getCode(), "UAH");
-                rate.ifPresent(value -> exchangeRates.put(currency.getCode() + " -> UAH", value));
+                rate.ifPresent(value -> exchangeRates.put(currency.getCode() + "-UAH", value));
             }
         }
         return exchangeRates;
@@ -153,7 +159,7 @@ public class ExchangeRateService {
         messagingTemplate.convertAndSend("/topic/balances", balances);
     }
 
-       public void addBalance(String currency, BigDecimal amount) {
+    public void addBalance(String currency, BigDecimal amount) {
         balances.put(currency, balances.get(currency).add(amount));
         messagingTemplate.convertAndSend("/topic/balances", balances);
     }
