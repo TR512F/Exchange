@@ -1,44 +1,47 @@
-Перед запуском добавить данные про БД в переменные середы.
-    url: ${DB_URL}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+Before launching, add database details to environment variables:
+url: ${DB_URL}
+username: ${DB_USER}
+password: ${DB_PASSWORD}
 
---------------------- Update 23-12-2024 ---------------------
+Update 23-12-2024
 
-1. Доработан DataInitializer (теперь проэкт полностью инициализируется при первом запуске)
-    - инициализация 'currencies' если данные отсутствуют;
-    - заполнение таблицы 'exchange_rates' если данные отсутствуют;
-    - добавление первых пользователей если такоыве отсутствуют (admin, user);
+1. DataInitializer updated (the project is now fully initialized on the first launch):
+    - Initialize currencies if data is missing.
+    - Populate the exchange_rates table if data is missing.
+    - Add initial users if missing (admin, user).
 
-2. Доработка UI (немного оптимизирован дизайн, добавлен Bootstrap, отделен JS)
-    - добавлен Logout
-    - добавлена передача Роли при авторизации
-        админская панель появляется только если передана роль Админ
-    - поля для ввода валют переделаны на списки
-    - список валют в селекте динамически обновляется при изменении
-    - поле для ввода периода заменено на переключатель
+2. UI updates:
+    - Improved design (added Bootstrap, separated JS).
+    - Logout functionality added.
+    - Role-based authorization:
+        - Admin panel appears only if the "Admin" role is passed during authorization.
+    - Currency input fields replaced with dropdowns.
+    - Currency dropdown list dynamically updates on changes.
+    - Period input replaced with a toggle switch.
 
 3. Bugfix:
-    - устранены ошибки при заполнении таблицы на Exchange Rates фронте
-    т.к. в ТЗ чётко не описано каким должен быть вывод то валюта выводится как String
-    в планах перевести работу с currency со String на Currency
+    - Fixed issues with populating the Exchange Rates table on the frontend:
+    - Since the requirements did not specify how the output should look, currency is currently displayed as a String.
+    - Future plans include switching to Currency objects from String.
 
-4. Added:
-    - WebSocket authorize by token
-    - валидация в setExchangeRate() (курс > 0, валюта не пустая)
-    - валидация в getExchangeRate() (курс > 0, валюты не пустае)
-    - валидация в getMaxMinExchangeRate() (курс > 0, валюта не пустая)
-    - валидация запроса на обмен (сумма > 0, валюты не пустые)
-    - валидация в SignUpRequest (NotNull, NotBlank)
-    - валидация в SignInRequest (NotNull, NotBlank)
-    - валидация в addCurrency() (NotNull, NotBlank)
-    - валидация в deleteCurrency() (NotNull, NotBlank)
-    - валидация в blockUser() (NotNull, NotBlank)
-    - валидация в unblockUser() (NotNull, NotBlank)
-    - валидация в setAdmin() (NotNull, NotBlank)
-    - валидация в setUser() (NotNull, NotBlank)
-    ...
+4. Added features:
+    - WebSocket authorization via token.
+    - Validation improvements:
+    - setExchangeRate() (rate > 0, currency not empty).
+    - getExchangeRate() (rate > 0, currencies not empty).
+    - getMaxMinExchangeRate() (rate > 0, currency not empty).
+    - Exchange request validation (amount > 0, currencies not empty).
+    - Validation in SignUpRequest (NotNull, NotBlank).
+    - Validation in SignInRequest (NotNull, NotBlank).
+    - Validation in addCurrency() (NotNull, NotBlank).
+    - Validation in deleteCurrency() (NotNull, NotBlank).
+    - Validation in blockUser() (NotNull, NotBlank).
+    - Validation in unblockUser() (NotNull, NotBlank).
+    - Validation in setAdmin() (NotNull, NotBlank).
+    - Validation in setUser() (NotNull, NotBlank).
 
-    Часть кода на фронте в jQuery, впервые с ним сталкиваюсь, опробовал использование.
-    При необходрмости можно всё заменить на JS.
-// Валидацию делать на уровне контроллера или сервиса? Через if или пробросом ошибки? Прошу комментария)
+5. Notes:
+    - Some code on the frontend is written in jQuery. This was my first time using it, but if necessary, it can be replaced with plain JavaScript.
+
+6. Question:
+    - Should validation be implemented at the controller or service level? Should it be done using if statements or by throwing exceptions? I’d appreciate your comments!
